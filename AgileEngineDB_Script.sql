@@ -161,6 +161,20 @@ WHERE ProductID IN (2,3,4) AND StoreID IN (3, 4)
 */
 
 
+
+
+View prices in stores:
+GetProductStorePrice
+
+Examples of a call:
+EXEC GetProductStorePrice @ProductID = NULL, @StoreID = NULL
+EXEC GetProductStorePrice @ProductID = 1, @StoreID = NULL
+EXEC GetProductStorePrice @ProductID = NULL, @StoreID = 2
+EXEC GetProductStorePrice @ProductID = 3, @StoreID = 3
+
+
+
+
 Database maintenance:
 RebuildsIndexesUpdatesStatistics -- no comments, must have
 
@@ -1984,6 +1998,89 @@ GO
 -- #############################################################
 
 -- Stored procedure UpdatePriceBigRecordset, END
+
+
+
+-- Stored procedure GetProductStorePrice, BEGIN
+
+USE AgileEngineDB 
+GO
+
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[GetProductStorePrice]') AND type in (N'P', N'PC'))
+	DROP PROCEDURE [dbo].[GetProductStorePrice]
+GO
+
+-- =============================================
+-- Author:		Ihor Kalchuk
+-- Create date: 12 October 2017
+-- Description:	Test task
+-- =============================================
+
+CREATE PROCEDURE [dbo].[GetProductStorePrice]
+	@ProductID INT = NULL,
+	@StoreID INT = NULL
+AS
+BEGIN
+	SET NOCOUNT ON;
+
+BEGIN TRY
+BEGIN TRANSACTION
+
+
+SELECT PSP.ProductID, P.ProductName, PT.ProductTypeName, S.StoreID, S.StoreName, PSP.Price
+FROM [dbo].[ProductStorePrice] AS PSP
+	INNER JOIN [dbo].[Products] AS P ON PSP.ProductID = P.ProductID
+	INNER JOIN [dbo].[Stores] AS S ON PSP.StoreID = S.StoreID
+	INNER JOIN [dbo].[ProductTypes] AS PT ON PT.ProductTypeID = P.ProductTypeID
+WHERE (PSP.ProductID = @ProductID OR @ProductID IS NULL) AND (PSP.StoreID = @StoreID OR @StoreID IS NULL)
+
+
+	IF EXISTS (SELECT transaction_id FROM sys.dm_tran_session_transactions WHERE session_id = @@SPID)
+		BEGIN
+			COMMIT TRANSACTION
+		END
+
+END TRY
+
+BEGIN CATCH
+
+	IF EXISTS (SELECT transaction_id FROM sys.dm_tran_session_transactions WHERE session_id = @@SPID)
+		BEGIN
+			ROLLBACK TRANSACTION
+		END
+	
+	DECLARE @ErrorMessage NVARCHAR(4000);
+    DECLARE @ErrorSeverity INT;
+    DECLARE @ErrorState INT;
+
+    SELECT 
+        @ErrorMessage = ERROR_MESSAGE(),
+        @ErrorSeverity = ERROR_SEVERITY(),
+        @ErrorState = ERROR_STATE();
+
+			RAISERROR (@ErrorMessage,
+					   @ErrorSeverity,
+					   @ErrorState
+					   )
+					   WITH LOG;
+
+END CATCH
+
+END
+GO
+
+-- #############################################################
+-- #############################################################
+-- #############################################################
+
+-- Stored procedure GetProductStorePrice, END
+
+
 
 -- Stored procedure RebuildsIndexesUpdatesStatistics, BEGIN
 
